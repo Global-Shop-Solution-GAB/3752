@@ -1,0 +1,127 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Variable.UDT.Rebuild.Define("TableName",String)
+Variable.UDT.Rebuild.Define("FileName",String)
+Variable.UDT.Rebuild.Define("FQFN",String)
+Variable.uGlobal.uRebuilt.Declare("Rebuild")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Coded by: SUPERVSR
+'Project Start Date: 3/8/2011
+
+V.Local.sFile.Declare(String)
+V.Local.sText.Declare(String)
+V.Local.sString.Declare(String)
+V.Local.iCount.Declare(Long)
+V.Local.iRet.Declare(Long)
+V.Local.sEmail.Declare(String)
+V.Local.iEmailRet.Declare(Long)
+V.Local.iUB.Declare(Long)
+V.Local.sFileName.Declare(String)
+V.Local.sReplace.Declare(String)
+V.Local.sUEmail.Declare(String)
+V.Local.sUName.Declare(String)
+V.Local.bRet.Declare(Boolean)
+V.Local.bLog.Declare(Boolean)
+V.Local.sTest.Declare(String)
+
+'F.Intrinsic.Debug.Stop
+F.Intrinsic.String.Concat(V.Caller.FilesDir,"\RebuildList.txt",V.Local.sFile)
+'check to see if the RebuildList.txt file exists
+F.Intrinsic.File.Exists(V.Local.sFile,V.Local.bRet)
+F.Intrinsic.Control.If(V.Local.bRet,=,True)
+	'Converts the RebuildList.txt file to string
+	F.Intrinsic.file.File2String(V.Local.sFile,V.Local.sString)
+	F.Intrinsic.String.Split(V.Local.sString,V.Ambient.NewLine,V.Local.sText)
+	'deletes the rbldcli.log file
+	F.Automation.pervasive.ClearRebuildLog
+
+	F.Intrinsic.Control.For(V.Local.iCount,0,V.Local.sText.UBound,1)
+		'Checking for the Email addresses
+		F.Intrinsic.String.Instr(V.Local.sText(v.Local.iCount),"@",1,V.Local.iEmailRet)
+		F.Intrinsic.Control.If(V.Local.iEmailRet,<>,0)
+			'Email address are saved in an array delimited by *!*
+			F.Intrinsic.String.Concat(V.Local.sEmail,V.Local.sText(v.Local.iCount),"*!*",V.Local.sEmail)
+		F.Intrinsic.Control.else
+
+			F.Intrinsic.Control.If(V.uGlobal.uRebuilt.UBound,=,-1)
+				V.uGlobal.uRebuilt.Redim(0,0)
+			F.Intrinsic.Control.Else
+				V.Local.iUB.Set(V.uGlobal.uRebuilt.UBound)
+				F.Intrinsic.Math.Add(V.Local.iUB,1,V.Local.iUB)
+				V.uGlobal.uRebuilt.RedimPreserve(0,V.Local.iUB)
+			F.Intrinsic.Control.EndIf
+
+			F.Automation.pervasive.GetFileNameFromTableName(V.Local.sText(v.Local.iCount),V.Local.sFile)
+			V.uGlobal.uRebuilt(v.Local.iUB)!FQFN.Set(V.Local.sFile)
+			V.uGlobal.uRebuilt(v.Local.iUB)!TableName.Set(V.Local.sText(v.Local.iCount))
+			F.Intrinsic.File.GetFileNameFromFQN(V.Local.sFile,V.Local.sFileName)
+			V.uGlobal.uRebuilt(v.local.iUB)!FileName.Set(V.Local.sFileName)
+			F.Automation.Pervasive.RebuildFile(V.Local.sFile,V.Local.iRet)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.iCount)
+
+	F.Intrinsic.String.Concat(V.Caller.FilesDir,"\rbldcli.log",V.Local.sFile)
+	'checks to see if  the rbldcli.log file exists
+	F.Intrinsic.File.Exists(V.Local.sFile,V.Local.bLog)
+
+	F.Intrinsic.Control.If(V.Local.bLog,=,True)
+		F.Intrinsic.File.File2String(V.Local.sFile,V.Local.sText)
+		F.Intrinsic.Control.If(V.Local.sText,<>,"")
+
+			F.Intrinsic.Control.For(V.Local.iCount,0,V.uGlobal.uRebuilt.UBound,1)
+				F.Intrinsic.String.Concat("   ",V.uGlobal.uRebuilt(v.local.iCount)!TableName,"   (",V.uGlobal.uRebuilt(v.local.iCount)!FileName,") ",V.local.sReplace)
+				F.Intrinsic.String.Replace(V.Local.sText,V.uGlobal.uRebuilt(v.Local.iCount)!FileName,V.Local.sReplace,V.Local.sText)
+			F.Intrinsic.Control.Next(V.Local.iCount)
+
+			F.Intrinsic.String.Concat(V.Caller.FilesDir,"\RebuildLog.txt",V.Local.sFile)
+			F.Intrinsic.File.String2File(V.Local.sFile,V.Local.sText)
+			F.Intrinsic.String.Split(V.Local.sEmail,"*!*",V.Local.sEmail)
+
+			F.Intrinsic.Control.If(V.Local.sEmail,<>,"")
+				'Checks for the name and the Email addresses of the user
+				F.Global.Security.GetUserEmail(V.Caller.User,V.Local.sUEmail)
+				F.Global.Security.GetFullName(V.Caller.User,V.Local.sUName)
+'F.Intrinsic.Debug.Stop
+				F.Intrinsic.Control.For(V.Local.iCount,0,V.Local.sEmail.UBound,1)
+					F.Intrinsic.Control.If(V.Local.sEmail(v.Local.iCount),<>,"")
+						F.Intrinsic.Control.If(V.Local.sUEmail,=,"")
+							V.Local.sUEmail.Set(V.Local.sEmail(v.Local.iCount))
+							V.Local.sUName.Set(" ")
+						F.Intrinsic.Control.EndIf
+						'EMails the log file to the list of Email addresses in the database
+'						F.Intrinsic.String.Concat(V.Local.sEmail(v.Local.iCount)," ",V.Local.sUEmail,V.Local.sUName,"File Rebuild","This is new",V.Local.sFile,V.Local.sTest)
+'						F.Intrinsic.UI.Msgbox(V.Local.sTest)
+						F.Global.Messaging.CreateEMMessage(V.Local.sEmail(v.Local.iCount)," ",V.Local.sUEmail,V.Local.sUName,"File Rebuild","This is the new rebuild file log",V.Local.sFile)
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.Next(V.Local.iCount)
+			'Exit the sub if the if there are no Email addresses in the list
+			F.Intrinsic.Control.Else
+				F.Intrinsic.Control.ExitSub
+			F.Intrinsic.Control.EndIf
+		'Exit the sub if there are no table names in the RebuldList.txt file
+		F.Intrinsic.Control.Else
+			F.Intrinsic.Control.ExitSub
+		F.Intrinsic.Control.EndIf
+	'Exit the sub if the rldcli.log file doesn't exist
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.ExitSub
+	F.Intrinsic.Control.EndIf
+'Exit the sub if the RebuildList.txt file doesn't exist
+F.Intrinsic.Control.Else
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+
+Program.Sub.Main.End
+
+Program.Sub.unload.Start
+F.Intrinsic.Control.End
+
+Program.Sub.unload.End
+
+
